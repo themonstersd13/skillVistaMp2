@@ -1,0 +1,131 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-carbon-950: #050816;
+  --color-carbon-900: #0b1020;
+  --color-carbon-800: #111930;
+  --color-carbon-700: #1a2541;
+  --color-carbon-600: #25304f;
+  --color-slate-300: #b9c3da;
+  --color-slate-200: #d5def2;
+  --color-slate-100: #eef3ff;
+  --color-cyan-300: #6de6ff;
+  --color-cyan-400: #3bcdf4;
+  --color-emerald-300: #6ff7ce;
+  --color-amber-300: #ffca80;
+  --font-display: 'Sora', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+:root {
+  color: var(--color-slate-100);
+  background:
+    radial-gradient(circle at top, rgba(59, 205, 244, 0.16), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(111, 247, 206, 0.12), transparent 24%),
+    linear-gradient(180deg, #050816 0%, #07101f 48%, #03060f 100%);
+  font-family: var(--font-display);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.75), transparent 92%);
+  content: '';
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(109, 230, 255, 0.22);
+  color: var(--color-slate-100);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(17, 25, 48, 0.65);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(109, 230, 255, 0.25);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(11, 16, 32, 0.88), rgba(7, 12, 24, 0.82));
+  border: 1px solid rgba(185, 195, 218, 0.12);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+}
+
+.status-dot {
+  box-shadow: 0 0 20px currentColor;
+}
+
+.grid-fade {
+  background-image:
+    linear-gradient(rgba(109, 230, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(109, 230, 255, 0.07) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.recording-wave {
+  animation: pulse-wave 1.4s ease-in-out infinite;
+}
+
+.typing-cursor {
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-wave {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
