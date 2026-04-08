@@ -6,7 +6,8 @@ This repository now contains a working SKILLVISTA demo stack with both the candi
 
 ### Frontend
 
-- JWT-based candidate login with browser-session persistence
+- Backend-driven candidate login with browser-session persistence
+- Manual JWT fallback for existing signed tokens
 - Protected routing into the interview arena
 - Mandatory camera and microphone pre-check
 - Live Socket.IO interview session management
@@ -19,6 +20,7 @@ This repository now contains a working SKILLVISTA demo stack with both the candi
 ### Backend
 
 - FastAPI REST API on port `4000`
+- Auth endpoints that issue candidate JWTs from seeded SQLite records
 - Python Socket.IO server compatible with the current React client
 - SQLite persistence for:
   - students
@@ -28,6 +30,7 @@ This repository now contains a working SKILLVISTA demo stack with both the candi
   - interview turns
   - final evaluation reports
 - Seeded demo data for FY, SY, TY, and LY students plus faculty records
+- Seeded starter sessions and reports so every demo candidate has backend data immediately
 - Year-wise tech and non-tech content packs for prompt grounding
 - RAG-style adaptive question generation using:
   - Ollama `llama3.1` as primary
@@ -51,7 +54,7 @@ This repository now contains a working SKILLVISTA demo stack with both the candi
 ```text
 .
 |-- backend/
-|   |-- app/
+|   |-- src/
 |   |   |-- config.py
 |   |   |-- db.py
 |   |   |-- dependencies.py
@@ -74,24 +77,22 @@ This repository now contains a working SKILLVISTA demo stack with both the candi
 |   |       |-- rag.py
 |   |       |-- seeder.py
 |   |       `-- transcription.py
+|   |-- uploads/
 |   |-- .env.example
 |   |-- README.md
-|   `-- requirements.txt
-|-- src/
-|   |-- components/
-|   |-- context/
-|   |-- hooks/
-|   |-- pages/
-|   `-- services/
-|-- .env.example
-|-- package.json
-|-- README.md
-`-- REMAINING_WORK.md
+|   |-- requirements.txt
+|   `-- skillvista_demo.db
+`-- web app/
+    |-- src/
+    |-- public/
+    |-- .env.example
+    |-- package.json
+    `-- REMAINING_WORK.md
 ```
 
 ## Frontend Environment
 
-Create a local `.env` file in the repository root from `.env.example`.
+Create a local `.env` file in `web app/` from `web app/.env.example`.
 
 ```bash
 VITE_API_BASE_URL=http://localhost:4000/api
@@ -109,12 +110,13 @@ SKILLVISTA_DB_URL=sqlite:///./skillvista_demo.db
 SKILLVISTA_JWT_SECRET=skillvista-dev-secret
 SKILLVISTA_ALLOWED_ORIGINS=http://localhost:5173
 SKILLVISTA_SOCKET_PATH=/socket.io
+SKILLVISTA_UPLOADS_DIR=./uploads
 
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.1:8b
 
 GEMINI_API_KEY=
-GEMINI_TRANSCRIBE_MODEL=gemini-2.0-flash
+GEMINI_TRANSCRIBE_MODEL=gemini-2.5-flash-lite
 
 GROQ_API_KEY=
 GROQ_CHAT_MODEL=llama-3.3-70b-versatile
@@ -135,7 +137,7 @@ py -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
-uvicorn app.main:app --reload --port 4000
+.\.venv\Scripts\python.exe -m uvicorn src.main:app --reload --port 4000
 ```
 
 The backend will run at:
@@ -149,6 +151,7 @@ http://localhost:4000
 From the project root:
 
 ```powershell
+cd "web app"
 npm install
 copy .env.example .env
 npm run dev
@@ -162,12 +165,12 @@ http://localhost:5173
 
 ### After both are running
 
-1. Open `http://localhost:4000/api/dev/tokens`
-2. Copy one demo candidate token
-3. Open the frontend in the browser
-4. Paste the token into the login screen
-5. Run the hardware check
-6. Start the interview
+1. Open the frontend in the browser
+2. Choose one seeded candidate from the login screen
+3. Run the hardware check
+4. Start the interview
+5. Answer prompts and finish the session
+6. Open the report screen to review the stored evaluation
 
 ## Quick Restart
 
@@ -178,17 +181,21 @@ If dependencies and `.env` files are already set up, you only need:
 ```powershell
 cd backend
 .venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 4000
+.\.venv\Scripts\python.exe -m uvicorn src.main:app --reload --port 4000
 ```
 
 ### Frontend
 
 ```powershell
+cd "web app"
 npm run dev
 ```
 
 ## Key API Endpoints
 
+- `GET /api/auth/candidates`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
 - `GET /api/health`
 - `POST /api/dev/seed`
 - `GET /api/dev/tokens`
@@ -234,4 +241,4 @@ The backend has been smoke-tested locally with:
 
 - The backend is structured so your colleague can later add RBAC, faculty authoring flows, and a separate app for report consumption without changing the core evaluation storage shape.
 - When Gemini or Groq keys are not configured, the demo still works using deterministic fallback behavior so development is not blocked.
-- See [REMAINING_WORK.md](e:\PROGRAMING\mp2\web app\REMAINING_WORK.md) for the smaller set of production-oriented items still open.
+- See `web app/REMAINING_WORK.md` for the smaller set of production-oriented items still open.

@@ -70,10 +70,33 @@ function readInitialAuthState() {
 export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(readInitialAuthState)
 
-  const signIn = useCallback((nextToken) => {
-    const trimmedToken = nextToken.trim()
+  const signIn = useCallback((credentials) => {
+    const nextToken =
+      typeof credentials === 'string'
+        ? credentials
+        : credentials?.token
+
+    const providedUser =
+      typeof credentials === 'string'
+        ? null
+        : credentials?.user ?? credentials?.student ?? null
+
+    const trimmedToken = nextToken?.trim()
+
+    if (!trimmedToken) {
+      throw new Error('A valid access token is required.')
+    }
+
     const payload = decodeJwtPayload(trimmedToken)
-    const nextUser = normalizeUserClaims(payload)
+    const nextUser = providedUser
+      ? {
+          candidateId: String(providedUser.id ?? payload.sub ?? 'candidate'),
+          name: providedUser.name ?? payload.name ?? 'Candidate',
+          email: providedUser.email ?? payload.email ?? '',
+          role: payload.role ?? 'candidate',
+          expiresAt: payload.exp ? payload.exp * 1000 : null,
+        }
+      : normalizeUserClaims(payload)
 
     if (nextUser.expiresAt && nextUser.expiresAt < Date.now()) {
       throw new Error('This access token has expired. Request a fresh JWT.')

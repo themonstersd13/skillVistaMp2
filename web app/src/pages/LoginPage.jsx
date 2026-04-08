@@ -4,9 +4,9 @@ import LoginPanel from '../components/auth/LoginPanel'
 const portalHighlights = [
   {
     icon: ShieldCheck,
-    title: 'JWT-gated interview access',
+    title: 'Database-backed candidate access',
     description:
-      'Candidates enter only with faculty-issued tokens and the portal keeps auth state in a browser session.',
+      'Candidates can be loaded directly from the FastAPI database, and the portal still supports JWT-based access when needed.',
   },
   {
     icon: Webcam,

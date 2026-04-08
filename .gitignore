@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Env files
+.env
+*.local
+backend/.env
+
+# Backend artifacts
+backend/*.db
+
+# Editor files
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
