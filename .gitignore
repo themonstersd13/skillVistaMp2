@@ -11,6 +11,9 @@ lerna-debug.log*
 node_modules/
 dist/
 dist-ssr/
+.expo/
+web-build/
+expo-env.d.ts
 
 # Python
 .venv/
@@ -24,6 +27,9 @@ backend/.env
 
 # Backend artifacts
 backend/*.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/uploads/interviews/
 
 # Editor files
 .idea/
@@ -33,3 +39,43 @@ backend/*.db
 *.njsproj
 *.sln
 *.sw?
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
