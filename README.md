@@ -45,3 +45,5 @@ Once both services are running:
 3. Start an interview, upload answers, and view the generated report.
 
 Manual JWT login still works, but the primary flow now comes from the FastAPI database.
+
+## app 
