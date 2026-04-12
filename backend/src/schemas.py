@@ -50,6 +50,9 @@ class StudentSummary(BaseModel):
     academic_year: str
     specialization: str
     target_role: str
+    strengths: list[str] = Field(default_factory=list)
+    stretch_goals: list[str] = Field(default_factory=list)
+    profile: dict[str, Any] = Field(default_factory=dict)
 
 
 class SessionSummary(BaseModel):
@@ -115,3 +118,10 @@ class AuthLoginRequest(BaseModel):
 class AuthLoginResponse(BaseModel):
     token: str
     student: StudentSummary
+
+
+class CandidateProfileUpdateRequest(BaseModel):
+    target_role: str = Field(min_length=1, max_length=120)
+    strengths: list[str] = Field(default_factory=list)
+    stretch_goals: list[str] = Field(default_factory=list)
+    profile: dict[str, Any] = Field(default_factory=dict)

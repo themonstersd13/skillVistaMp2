@@ -15,36 +15,68 @@ DEMO_STUDENTS = [
         "email": "aarav.patil@skillvista.dev",
         "academic_year": "FY",
         "specialization": "Computer Engineering",
-        "target_role": "Software Engineering Intern",
-        "strengths": ["curiosity", "consistency", "basic Python"],
-        "stretch_goals": ["DSA confidence", "public speaking"],
+        "target_role": "Python Developer Intern",
+        "strengths": ["Python basics", "consistency", "curiosity"],
+        "stretch_goals": ["problem solving confidence", "clear spoken communication"],
+        "profile_json": {
+            "headline": "First-year learner building practical Python and computational thinking.",
+            "preferred_languages": ["Python", "C"],
+            "current_focus": ["Python scripting", "problem decomposition", "Git basics"],
+            "project_context": "Lab exercises, automation mini scripts, and beginner command-line programs.",
+            "evidence": ["Built a calculator CLI", "Practiced file handling and loops", "Solved beginner coding problems weekly"],
+            "interview_preferences": ["step-by-step questions", "practical examples"],
+        },
     },
     {
         "name": "Ishita Kulkarni",
         "email": "ishita.kulkarni@skillvista.dev",
         "academic_year": "SY",
         "specialization": "Information Technology",
-        "target_role": "Frontend Developer Intern",
+        "target_role": "Frontend Engineer Intern",
         "strengths": ["React basics", "UI polish", "peer mentoring"],
-        "stretch_goals": ["backend APIs", "state management depth"],
+        "stretch_goals": ["backend API integration", "state management depth"],
+        "profile_json": {
+            "headline": "Second-year student combining interface polish with growing full-stack confidence.",
+            "preferred_languages": ["JavaScript", "TypeScript", "Python"],
+            "current_focus": ["React patterns", "REST API integration", "responsive layouts"],
+            "project_context": "Academic web apps, team dashboards, and component-driven frontend work.",
+            "evidence": ["Built dashboard interfaces", "Implemented auth flows", "Presented team demos"],
+            "interview_preferences": ["product-oriented questions", "real project tradeoffs"],
+        },
     },
     {
         "name": "Rohan Shinde",
         "email": "rohan.shinde@skillvista.dev",
         "academic_year": "TY",
         "specialization": "Artificial Intelligence and Data Science",
-        "target_role": "AI/ML Engineer Intern",
+        "target_role": "Applied AI Engineer Intern",
         "strengths": ["Python", "data pipelines", "ownership"],
         "stretch_goals": ["system design", "interview precision"],
+        "profile_json": {
+            "headline": "Third-year student translating ML coursework into product-oriented AI workflows.",
+            "preferred_languages": ["Python", "SQL"],
+            "current_focus": ["model evaluation", "data pipelines", "AI product metrics"],
+            "project_context": "ML prototypes, analytics dashboards, and interview intelligence experiments.",
+            "evidence": ["Built classification projects", "Worked on evaluation scripts", "Presented model tradeoffs"],
+            "interview_preferences": ["architecture reasoning", "metrics and validation"],
+        },
     },
     {
         "name": "Neha Deshmukh",
         "email": "neha.deshmukh@skillvista.dev",
         "academic_year": "LY",
         "specialization": "Computer Science",
-        "target_role": "Backend Engineer",
+        "target_role": "Backend Platform Engineer",
         "strengths": ["API design", "SQL", "communication"],
         "stretch_goals": ["distributed systems", "architecture depth"],
+        "profile_json": {
+            "headline": "Final-year candidate positioning for backend and platform-heavy engineering roles.",
+            "preferred_languages": ["Python", "Java", "SQL"],
+            "current_focus": ["API reliability", "database design", "service architecture"],
+            "project_context": "Capstone backend systems, scalable APIs, and production-style debugging.",
+            "evidence": ["Built CRUD and auth services", "Optimized SQL queries", "Led backend delivery for final-year project"],
+            "interview_preferences": ["high-signal backend rounds", "system tradeoff discussions"],
+        },
     },
 ]
 
@@ -55,13 +87,27 @@ DEMO_FACULTY = [
 
 
 def ensure_demo_data(db: Session) -> dict[str, int]:
-    if not db.query(Faculty).count():
-        for faculty in DEMO_FACULTY:
-            db.add(Faculty(**faculty))
+    for faculty_payload in DEMO_FACULTY:
+        faculty = db.query(Faculty).filter(Faculty.email == faculty_payload["email"]).one_or_none()
+        if faculty is None:
+            db.add(Faculty(**faculty_payload))
+        else:
+            faculty.name = faculty_payload["name"]
+            faculty.department = faculty_payload["department"]
 
-    if not db.query(Student).count():
-        for student in DEMO_STUDENTS:
-            db.add(Student(**student))
+    for student_payload in DEMO_STUDENTS:
+        student = db.query(Student).filter(Student.email == student_payload["email"]).one_or_none()
+        if student is None:
+            db.add(Student(**student_payload))
+        elif not (student.profile_json or {}).get("customized_by_candidate"):
+            student.name = student_payload["name"]
+            student.academic_year = student_payload["academic_year"]
+            student.specialization = student_payload["specialization"]
+            student.target_role = student_payload["target_role"]
+            student.strengths = student_payload["strengths"]
+            student.stretch_goals = student_payload["stretch_goals"]
+            if not student.profile_json:
+                student.profile_json = student_payload["profile_json"]
 
     db.commit()
     year_content = sync_year_content(db)

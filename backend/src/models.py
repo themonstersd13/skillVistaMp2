@@ -30,6 +30,7 @@ class Student(Base):
     target_role: Mapped[str] = mapped_column(String(120))
     strengths: Mapped[list[str]] = mapped_column(JSON, default=list)
     stretch_goals: Mapped[list[str]] = mapped_column(JSON, default=list)
+    profile_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     sessions: Mapped[list["InterviewSession"]] = relationship(back_populates="student")

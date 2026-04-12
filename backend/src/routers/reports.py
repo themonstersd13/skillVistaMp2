@@ -8,6 +8,31 @@ from ..models import EvaluationReport, Student
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
+def _normalize_qualitative_payload(qualitative: dict):
+    if "technical_analysis" in qualitative and "non_technical_analysis" in qualitative:
+        return qualitative
+
+    base_summary = qualitative.get("summary", "A stored evaluation is available for this session.")
+    return {
+        **qualitative,
+        "technical_analysis": {
+            "summary": f"Technical lens: {base_summary}",
+            "strengths": qualitative.get("strengths", []),
+            "weaknesses": qualitative.get("weaknesses", []),
+            "opportunities": qualitative.get("opportunities", []),
+            "threats": qualitative.get("threats", []),
+        },
+        "non_technical_analysis": {
+            "summary": f"Professional lens: {base_summary}",
+            "strengths": qualitative.get("strengths", []),
+            "weaknesses": qualitative.get("weaknesses", []),
+            "opportunities": qualitative.get("opportunities", []),
+            "threats": qualitative.get("threats", []),
+        },
+        "recommended_focus": qualitative.get("recommended_focus", []),
+    }
+
+
 @router.get("/student/{student_id}")
 def get_latest_student_report(student_id: int, db: Session = Depends(get_db)):
     student = db.get(Student, student_id)
@@ -23,6 +48,8 @@ def get_latest_student_report(student_id: int, db: Session = Depends(get_db)):
     if not report:
         raise HTTPException(status_code=404, detail="No evaluation report found.")
 
+    normalized_qualitative = _normalize_qualitative_payload(report.qualitative_json or {})
+
     return {
         "student": {
             "id": student.id,
@@ -30,11 +57,15 @@ def get_latest_student_report(student_id: int, db: Session = Depends(get_db)):
             "academic_year": student.academic_year,
             "specialization": student.specialization,
             "target_role": student.target_role,
+            "strengths": student.strengths,
+            "stretch_goals": student.stretch_goals,
+            "profile": student.profile_json or {},
         },
-        "qualitative": report.qualitative_json,
+        "qualitative": normalized_qualitative,
         "quantitative": report.quantitative_json,
         "combined": report.combined_json,
         "createdAt": report.created_at,
+        "sessionId": report.session_id,
     }
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { KeyRound, LoaderCircle, LockKeyhole, TriangleAlert, UserRound } from 'lucide-react'
+import { ChevronDown, KeyRound, LoaderCircle, LockKeyhole, TriangleAlert, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
@@ -10,7 +10,7 @@ function CandidateCard({ candidate, loading, onSelect }) {
       type="button"
       onClick={() => onSelect(candidate)}
       disabled={loading}
-      className="rounded-[24px] border border-white/10 bg-white/4 p-4 text-left transition hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-70"
+      className="rounded-[24px] border border-white/10 bg-white/4 p-4 text-left transition hover:-translate-y-0.5 hover:bg-white/8 disabled:cursor-not-allowed disabled:opacity-70"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -35,6 +35,7 @@ function LoginPanel() {
   const { signIn } = useAuth()
   const [candidates, setCandidates] = useState([])
   const [loadingCandidates, setLoadingCandidates] = useState(true)
+  const [showManualAccess, setShowManualAccess] = useState(false)
   const [tokenInput, setTokenInput] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -91,7 +92,7 @@ function LoginPanel() {
         student_id: candidate.id,
       })
       signIn(response.data)
-      navigate('/app/dashboard', { replace: true })
+      navigate('/app/overview', { replace: true })
     } catch (nextError) {
       setError(nextError.response?.data?.detail ?? nextError.message)
     } finally {
@@ -107,7 +108,7 @@ function LoginPanel() {
 
     try {
       signIn(tokenInput)
-      navigate('/app/dashboard', { replace: true })
+      navigate('/app/overview', { replace: true })
     } catch (nextError) {
       setError(nextError.message)
     } finally {
@@ -116,15 +117,15 @@ function LoginPanel() {
   }
 
   return (
-    <section className="glass-panel w-full rounded-[32px] p-6 sm:p-8">
+    <section className="glass-panel w-full rounded-[32px] p-6 sm:p-8 lg:max-h-full lg:overflow-auto">
       <div className="mb-8">
         <div className="mb-4 inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-cyan-300">
           <LockKeyhole className="h-6 w-6" />
         </div>
-        <h2 className="text-3xl font-semibold text-slate-100">Access the interview terminal</h2>
+        <h2 className="text-3xl font-semibold text-slate-100">Open your interview workspace</h2>
         <p className="mt-3 max-w-lg text-sm leading-7 text-slate-300/74">
-          Candidate profiles come from the FastAPI database. Choose a seeded candidate for a full backend-connected flow,
-          or paste a signed JWT if you already have one.
+          Choose a candidate record from the backend to launch a context-aware interview flow. Manual JWT access stays
+          available, but the database-first path is the recommended one.
         </p>
       </div>
 
@@ -138,7 +139,7 @@ function LoginPanel() {
             </span>
           ) : null}
         </div>
-        <div className="grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {candidates.map((candidate) => (
             <CandidateCard
               key={candidate.id}
@@ -160,43 +161,56 @@ function LoginPanel() {
         ) : null}
       </div>
 
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        <label className="block space-y-3">
-          <span className="font-mono text-xs uppercase tracking-[0.32em] text-slate-300/60">Manual candidate access token</span>
-          <textarea
-            value={tokenInput}
-            onChange={(event) => setTokenInput(event.target.value)}
-            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            className="min-h-40 w-full rounded-[24px] border border-white/10 bg-carbon-900/80 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-400/40 focus:border-cyan-300/40"
-            required
-          />
-        </label>
+      <div className="mt-6 border-t border-white/10 pt-6">
+        <button
+          type="button"
+          onClick={() => setShowManualAccess((previous) => !previous)}
+          className="flex w-full items-center justify-between rounded-[22px] border border-white/10 bg-white/4 px-4 py-4 text-left text-sm font-medium text-slate-100 transition hover:bg-white/8"
+        >
+          <span>Use manual JWT access instead</span>
+          <ChevronDown className={`h-4 w-4 transition ${showManualAccess ? 'rotate-180' : ''}`} />
+        </button>
 
-        <div className="rounded-[24px] border border-white/8 bg-white/4 px-4 py-4">
+        {showManualAccess ? (
+          <form className="mt-5 space-y-5" onSubmit={handleSubmit}>
+            <label className="block space-y-3">
+              <span className="font-mono text-xs uppercase tracking-[0.32em] text-slate-300/60">Manual candidate access token</span>
+              <textarea
+                value={tokenInput}
+                onChange={(event) => setTokenInput(event.target.value)}
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                className="surface-input min-h-32 w-full rounded-[24px] border px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none transition placeholder:text-slate-400/40 focus:border-cyan-300/40"
+                required
+              />
+            </label>
+
+            <div className="rounded-[24px] border border-white/8 bg-white/4 px-4 py-4">
+              <div className="flex items-start gap-3">
+                <KeyRound className="mt-0.5 h-4 w-4 text-cyan-300" />
+                <p className="text-sm leading-7 text-slate-300/76">{tokenPreview}</p>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-[24px] bg-cyan-300 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-cyan-300/70"
+            >
+              <LockKeyhole className="h-4 w-4" />
+              {submitting && !loggingInCandidateId ? 'Validating token...' : 'Enter secure portal with JWT'}
+            </button>
+          </form>
+        ) : null}
+      </div>
+
+      {error ? (
+        <div className="mt-5 rounded-[24px] border border-rose-400/24 bg-rose-500/10 px-4 py-4 text-sm text-rose-200">
           <div className="flex items-start gap-3">
-            <KeyRound className="mt-0.5 h-4 w-4 text-cyan-300" />
-            <p className="text-sm leading-7 text-slate-300/76">{tokenPreview}</p>
+            <TriangleAlert className="mt-0.5 h-4 w-4" />
+            <span>{error}</span>
           </div>
         </div>
-
-        {error ? (
-          <div className="rounded-[24px] border border-rose-400/24 bg-rose-500/10 px-4 py-4 text-sm text-rose-200">
-            <div className="flex items-start gap-3">
-              <TriangleAlert className="mt-0.5 h-4 w-4" />
-              <span>{error}</span>
-            </div>
-          </div>
-        ) : null}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-[24px] bg-cyan-300 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-cyan-300/70"
-        >
-          <LockKeyhole className="h-4 w-4" />
-          {submitting && !loggingInCandidateId ? 'Validating token...' : 'Enter secure portal with JWT'}
-        </button>
-      </form>
+      ) : null}
     </section>
   )
 }

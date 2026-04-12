@@ -129,7 +129,7 @@ class InterviewRuntime:
             return {
                 "ack": ack,
                 "finished": True,
-                "report_id": report.id,
+                "report_id": report.id if report else None,
             }
 
         question_payload, provider = await self.rag.generate_question(
@@ -160,20 +160,18 @@ class InterviewRuntime:
         student: Student,
         turns: list[InterviewTurn] | None = None,
     ):
-        if session.status == "completed" and session.evaluation:
+        if session.status == "completed":
             return session.evaluation
 
-        turns = turns or (
-            db.query(InterviewTurn)
-            .filter(InterviewTurn.session_id == session.id)
-            .order_by(InterviewTurn.question_index.asc())
-            .all()
-        )
         session.status = "completed"
         session.completed_at = datetime.utcnow()
         db.commit()
         db.refresh(session)
-        return await self.evaluation.evaluate_and_store(db, session, student, turns)
+        
+        from ..workers.task_queue import task_queue
+        await task_queue.enqueue("evaluate_session", {"session_id": session.id})
+        
+        return session.evaluation
 
     def get_session_for_student(self, db: Session, session_id: str, student_id: int) -> InterviewSession:
         session = db.get(InterviewSession, session_id)

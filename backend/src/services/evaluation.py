@@ -38,6 +38,7 @@ class EvaluationService:
             "question_count": len(turns),
         }
         qualitative, provider = await self.rag.generate_swot(student, session_summary, quantitative)
+        recommended_focus = qualitative.get("recommended_focus", [])
 
         combined = {
             "student": {
@@ -46,6 +47,7 @@ class EvaluationService:
                 "academic_year": student.academic_year,
                 "specialization": student.specialization,
                 "target_role": student.target_role,
+                "profile": student.profile_json or {},
             },
             "session": {
                 "id": session.id,
@@ -56,7 +58,7 @@ class EvaluationService:
             "qualitative": qualitative,
             "quantitative": quantitative,
             "insights": {
-                "recommended_focus": [
+                "recommended_focus": recommended_focus or [
                     "Sharpen year-wise core technical fundamentals",
                     "Improve structured communication with examples and metrics",
                     "Practice answering follow-up questions with tradeoff reasoning",

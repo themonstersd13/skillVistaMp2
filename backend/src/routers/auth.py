@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..dependencies import get_current_student
 from ..models import EvaluationReport, Student
-from ..schemas import AuthCandidateOption, AuthLoginRequest, AuthLoginResponse, StudentSummary
+from ..schemas import (
+    AuthCandidateOption,
+    AuthLoginRequest,
+    AuthLoginResponse,
+    CandidateProfileUpdateRequest,
+    StudentSummary,
+)
 from ..security import create_candidate_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -18,6 +24,9 @@ def _serialize_student(student: Student) -> StudentSummary:
         academic_year=student.academic_year,
         specialization=student.specialization,
         target_role=student.target_role,
+        strengths=student.strengths,
+        stretch_goals=student.stretch_goals,
+        profile=student.profile_json or {},
     )
 
 
@@ -68,4 +77,20 @@ def login_candidate(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=StudentSummary)
 def get_current_candidate(student: Student = Depends(get_current_student)):
+    return _serialize_student(student)
+
+
+@router.patch("/me/profile", response_model=StudentSummary)
+def update_current_candidate_profile(
+    payload: CandidateProfileUpdateRequest,
+    student: Student = Depends(get_current_student),
+    db: Session = Depends(get_db),
+):
+    student.target_role = payload.target_role.strip()
+    student.strengths = [item.strip() for item in payload.strengths if item.strip()]
+    student.stretch_goals = [item.strip() for item in payload.stretch_goals if item.strip()]
+    student.profile_json = payload.profile
+    db.add(student)
+    db.commit()
+    db.refresh(student)
     return _serialize_student(student)

@@ -4,9 +4,12 @@ import { InterviewProvider } from './context/InterviewContext'
 import LoginPage from './pages/LoginPage'
 import LiveInterviewArena from './pages/LiveInterviewArena'
 import AppShell from './pages/AppShell'
-import DashboardPage from './pages/DashboardPage'
 import HistoryPage from './pages/HistoryPage'
+import OverviewPage from './pages/OverviewPage'
+import ProfilePage from './pages/ProfilePage'
 import ReportPage from './pages/ReportPage'
+import SetupPage from './pages/SetupPage'
+import FacultyDashboardPage from './pages/FacultyDashboardPage'
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth()
@@ -22,7 +25,7 @@ function RootRoute() {
   const { isAuthenticated } = useAuth()
 
   if (isAuthenticated) {
-    return <Navigate to="/app/dashboard" replace />
+    return <Navigate to="/app/overview" replace />
   }
 
   return <LoginPage />
@@ -44,11 +47,15 @@ function App() {
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/app" element={<ProtectedShell />}>
-          <Route index element={<Navigate to="/app/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route index element={<Navigate to="/app/overview" replace />} />
+          <Route path="dashboard" element={<Navigate to="/app/overview" replace />} />
+          <Route path="overview" element={<OverviewPage />} />
+          <Route path="setup" element={<SetupPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="interview" element={<LiveInterviewArena />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="report" element={<ReportPage />} />
+          <Route path="faculty" element={<FacultyDashboardPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

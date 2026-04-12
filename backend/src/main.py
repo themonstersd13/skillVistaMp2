@@ -8,12 +8,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .db import Base, SessionLocal, engine
+from .db import Base, SessionLocal, engine, run_startup_migrations
 from .models import InterviewSession
-from .routers import auth, dev, interview, reports
+from .mongo import close_mongo, init_mongo
+from .routers import auth, dev, interview, reports, faculty
 from .security import decode_candidate_token
 from .services.interview_runtime import InterviewRuntime
 from .services.seeder import ensure_demo_data
+from .workers.task_queue import task_queue
 
 settings = get_settings()
 runtime = InterviewRuntime()
@@ -22,14 +24,34 @@ sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.cors
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ── Startup ──
     settings.resolved_uploads_dir.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    run_startup_migrations()
+
+    # Seed demo data
     db = SessionLocal()
     try:
         ensure_demo_data(db)
     finally:
         db.close()
+
+    # Initialize MongoDB (if configured)
+    await init_mongo()
+
+    # Register and start background workers
+    from .workers.evaluation_worker import run_evaluation_task
+    from .workers.analytics_worker import run_cohort_analytics
+    task_queue.register("evaluate_session", run_evaluation_task)
+    task_queue.register("cohort_analytics", run_cohort_analytics)
+    
+    await task_queue.start()
+
     yield
+
+    # ── Shutdown ──
+    await task_queue.stop()
+    await close_mongo()
 
 
 fastapi_app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -44,12 +66,19 @@ fastapi_app.add_middleware(
 fastapi_app.include_router(auth.router)
 fastapi_app.include_router(interview.router)
 fastapi_app.include_router(reports.router)
+fastapi_app.include_router(faculty.router)
 fastapi_app.include_router(dev.router)
 
 
 @fastapi_app.get("/api/health")
 def healthcheck():
-    return {"status": "ok", "service": settings.app_name}
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "postgres": settings.is_postgres,
+        "mongodb": settings.has_mongodb,
+        "workers": "running",
+    }
 
 
 @sio.event

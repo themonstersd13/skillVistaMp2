@@ -4,15 +4,81 @@ import re
 from statistics import mean
 
 FILLER_WORDS = ("um", "uh", "like", "actually", "basically", "you know", "ah")
-POSITIVE_SIGNALS = ("designed", "implemented", "improved", "optimized", "measured", "learned", "delivered")
-COLLAB_SIGNALS = ("team", "collaborated", "communicated", "supported", "feedback", "ownership", "responsibility")
+POSITIVE_SIGNALS = ("designed", "implemented", "improved", "optimized", "measured", "learned", "delivered", "built", "shipped", "led", "solved", "achieved", "created")
+COLLAB_SIGNALS = ("team", "collaborated", "communicated", "supported", "feedback", "ownership", "responsibility", "mentored", "presented", "coordinated")
+NEGATIVE_SIGNALS = ("don't know", "not sure", "i guess", "maybe", "haven't", "couldn't", "never tried", "no idea")
+
+# STAR method indicators (Situation → Task → Action → Result)
+STAR_SITUATION = ("situation", "context", "background", "scenario", "project was", "when we")
+STAR_TASK = ("task was", "goal was", "objective", "responsible for", "assigned to", "needed to")
+STAR_ACTION = ("i decided", "i chose", "i implemented", "i designed", "i built", "i led", "i created", "my approach", "what i did")
+STAR_RESULT = ("result was", "outcome was", "impact was", "improved by", "reduced by", "increased by", "delivered", "learned that")
 
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"[a-zA-Z0-9_+#.-]+", text.lower())
 
 
-def extract_turn_features(transcript: str, duration_seconds: float, topic_keywords: list[str]) -> dict[str, float | int]:
+def _phrase_count(text: str, phrases: tuple[str, ...]) -> int:
+    """Count how many of the given phrases appear in the text."""
+    text_lower = text.lower()
+    return sum(1 for phrase in phrases if phrase in text_lower)
+
+
+def _sentiment_score(text: str) -> float:
+    """Simple rule-based sentiment score (0-1). Higher = more positive/confident."""
+    text_lower = text.lower()
+    positive = sum(1 for w in POSITIVE_SIGNALS if w in text_lower)
+    negative = sum(1 for w in NEGATIVE_SIGNALS if w in text_lower)
+    total = positive + negative
+    if total == 0:
+        return 0.5
+    return round(min(1.0, positive / total), 3)
+
+
+def _star_completeness(text: str) -> float:
+    """Measure how many STAR components the answer contains (0-1)."""
+    components = 0
+    if _phrase_count(text, STAR_SITUATION) > 0:
+        components += 1
+    if _phrase_count(text, STAR_TASK) > 0:
+        components += 1
+    if _phrase_count(text, STAR_ACTION) > 0:
+        components += 1
+    if _phrase_count(text, STAR_RESULT) > 0:
+        components += 1
+    return round(components / 4.0, 2)
+
+
+def _answer_completeness(text: str, question: str = "") -> float:
+    """Rough estimate of how completely the answer addresses the question (0-1)."""
+    tokens = _tokenize(text)
+    word_count = len(tokens)
+
+    # Length-based baseline
+    if word_count < 10:
+        base = 0.15
+    elif word_count < 30:
+        base = 0.4
+    elif word_count < 60:
+        base = 0.65
+    elif word_count < 120:
+        base = 0.8
+    else:
+        base = 0.9
+
+    # Bonus for positive signals
+    positive_count = _phrase_count(text, POSITIVE_SIGNALS)
+    bonus = min(0.1, positive_count * 0.02)
+
+    # Penalty for negative signals
+    negative_count = _phrase_count(text, NEGATIVE_SIGNALS)
+    penalty = min(0.2, negative_count * 0.05)
+
+    return round(min(1.0, max(0.0, base + bonus - penalty)), 3)
+
+
+def extract_turn_features(transcript: str, duration_seconds: float, topic_keywords: list[str], question_text: str = "") -> dict[str, float | int]:
     tokens = _tokenize(transcript)
     word_count = len(tokens)
     filler_count = sum(tokens.count(filler) for filler in FILLER_WORDS)
@@ -27,6 +93,15 @@ def extract_turn_features(transcript: str, duration_seconds: float, topic_keywor
     behavioral_signal = min(100.0, 40.0 + behavior_hits * 10.0 + min(word_count, 120) * 0.12)
     confidence_signal = max(20.0, min(100.0, 55.0 + confidence_hits * 8.0 - filler_count * 4.0))
 
+    # Enhanced signals
+    sentiment = _sentiment_score(transcript)
+    star_score = _star_completeness(transcript)
+    completeness = _answer_completeness(transcript, question_text)
+
+    # Boost scores based on enhanced signals
+    behavioral_signal = min(100.0, behavioral_signal + star_score * 12.0)
+    confidence_signal = min(100.0, confidence_signal + sentiment * 5.0)
+
     return {
         "word_count": word_count,
         "filler_count": filler_count,
@@ -35,6 +110,9 @@ def extract_turn_features(transcript: str, duration_seconds: float, topic_keywor
         "technical_signal": round(technical_signal, 2),
         "behavioral_signal": round(behavioral_signal, 2),
         "confidence_signal": round(confidence_signal, 2),
+        "sentiment_score": sentiment,
+        "star_completeness": star_score,
+        "answer_completeness": completeness,
     }
 
 

@@ -21,6 +21,20 @@ router = APIRouter(prefix="/api/interview", tags=["interview"])
 runtime = InterviewRuntime()
 
 
+def _serialize_student(student: Student) -> StudentSummary:
+    return StudentSummary(
+        id=student.id,
+        name=student.name,
+        email=student.email,
+        academic_year=student.academic_year,
+        specialization=student.specialization,
+        target_role=student.target_role,
+        strengths=student.strengths,
+        stretch_goals=student.stretch_goals,
+        profile=student.profile_json or {},
+    )
+
+
 @router.get("/dashboard", response_model=CandidateDashboardResponse)
 async def get_dashboard(
     student: Student = Depends(get_current_student),
@@ -34,18 +48,14 @@ async def get_dashboard(
             "completed_at": session.completed_at,
             "interview_type": session.metadata_json.get("interview_type", "tech"),
             "focus_area": session.metadata_json.get("focus_area", student.target_role),
+            "overall_readiness": session.evaluation.overall_readiness if session.evaluation else None,
+            "llm_provider": session.llm_provider,
+            "transcription_provider": session.transcription_provider,
         }
         for session in sorted(student.sessions, key=lambda item: item.started_at, reverse=True)[:5]
     ]
     return CandidateDashboardResponse(
-        student=StudentSummary(
-            id=student.id,
-            name=student.name,
-            email=student.email,
-            academic_year=student.academic_year,
-            specialization=student.specialization,
-            target_role=student.target_role,
-        ),
+        student=_serialize_student(student),
         interview_options={
             key: [InterviewOption(**item) for item in value]
             for key, value in get_interview_options(db, student.academic_year).items()
@@ -71,6 +81,10 @@ async def get_interview_history(
             "focus_area": session.metadata_json.get("focus_area", student.target_role),
             "question_count": len(session.turns),
             "report_ready": session.evaluation is not None,
+            "overall_readiness": session.evaluation.overall_readiness if session.evaluation else None,
+            "llm_provider": session.llm_provider,
+            "transcription_provider": session.transcription_provider,
+            "latest_question": session.current_question,
         }
         for session in sorted(student.sessions, key=lambda item: item.started_at, reverse=True)[:8]
     ]

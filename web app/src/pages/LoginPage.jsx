@@ -1,80 +1,90 @@
-import { ShieldCheck, Sparkles, Webcam, Waves } from 'lucide-react'
-import LoginPanel from '../components/auth/LoginPanel'
-
-const portalHighlights = [
-  {
-    icon: ShieldCheck,
-    title: 'Database-backed candidate access',
-    description:
-      'Candidates can be loaded directly from the FastAPI database, and the portal still supports JWT-based access when needed.',
-  },
-  {
-    icon: Webcam,
-    title: 'Mandatory hardware verification',
-    description:
-      'Camera and microphone checks happen before the interview starts so the live WebSocket session begins on verified devices.',
-  },
-  {
-    icon: Waves,
-    title: 'Realtime audio answer pipeline',
-    description:
-      'Answers are recorded through MediaRecorder and delivered to the backend as secure blobs when the candidate stops speaking.',
-  },
-]
+import { useEffect, useState } from 'react'
+import { ChevronRight, LogIn } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import api from '../services/api'
 
 function LoginPage() {
+  const navigate = useNavigate()
+  const { signIn } = useAuth()
+  const [candidates, setCandidates] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.get('/auth/candidates')
+        setCandidates(res.data)
+      } catch (e) {
+        setError(e.response?.data?.detail ?? e.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const handleLogin = async (studentId) => {
+    try {
+      const res = await api.post('/auth/login', { student_id: studentId })
+      signIn(res.data.token, res.data.student)
+      navigate('/app/overview', { replace: true })
+    } catch (e) {
+      setError(e.response?.data?.detail ?? e.message)
+    }
+  }
+
   return (
-    <main className="relative min-h-screen overflow-hidden px-6 py-10 text-slate-100 sm:px-8 lg:px-12">
-      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-7xl gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="glass-panel relative overflow-hidden rounded-[32px] border border-white/10 p-8 sm:p-10 lg:p-12">
-          <div className="absolute inset-0 grid-fade opacity-30" />
-          <div className="relative flex h-full flex-col justify-between gap-10">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-xs font-medium uppercase tracking-[0.32em] text-cyan-300">
-                <Sparkles className="h-4 w-4" />
-                SKILLVISTA Candidate Terminal
-              </div>
-
-              <div className="max-w-2xl space-y-5">
-                <p className="font-mono text-sm uppercase tracking-[0.4em] text-slate-300/70">
-                  Adaptive mock interviews for engineers
-                </p>
-                <h1 className="max-w-3xl font-display text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
-                  A distraction-free interview arena that streams every prompt live from the backend.
-                </h1>
-                <p className="max-w-2xl text-base leading-8 text-slate-300/82 sm:text-lg">
-                  This portal holds no hardcoded question bank. Once authenticated, it becomes a secure terminal for your
-                  camera, microphone, and live session link to the AI interview engine.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              {portalHighlights.map((highlight) => {
-                const HighlightIcon = highlight.icon
-
-                return (
-                  <article
-                    key={highlight.title}
-                  className="rounded-3xl border border-white/8 bg-white/4 p-5 transition-transform duration-300 hover:-translate-y-1"
-                  >
-                    <div className="mb-4 inline-flex rounded-2xl border border-cyan-300/20 bg-cyan-300/12 p-3 text-cyan-300">
-                      <HighlightIcon className="h-5 w-5" />
-                    </div>
-                    <h2 className="mb-2 text-lg font-semibold text-slate-100">{highlight.title}</h2>
-                    <p className="text-sm leading-7 text-slate-300/72">{highlight.description}</p>
-                  </article>
-                )
-              })}
-            </div>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--app-bg)' }}>
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <div className="inline-flex w-12 h-12 rounded-xl items-center justify-center mb-3" style={{ background: 'var(--primary)' }}>
+            <span className="text-white text-lg font-bold">SV</span>
           </div>
-        </section>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--app-text)' }}>SkillVista</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--app-text-muted)' }}>AI-Powered Interview Intelligence</p>
+        </div>
 
-        <aside className="flex items-center">
-          <LoginPanel />
-        </aside>
+        <div className="sv-card-lg p-5">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: 'var(--app-text)' }}>Select a candidate to begin</h2>
+
+          {loading && <p className="text-sm" style={{ color: 'var(--app-text-muted)' }}>Loading candidates...</p>}
+          {error && <p className="text-sm" style={{ color: '#FB7185' }}>{error}</p>}
+
+          <div className="grid gap-2">
+            {candidates.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => handleLogin(c.id)}
+                className="sv-card-interactive p-3.5 w-full text-left flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
+                    {c.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--app-text)' }}>{c.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--app-text-muted)' }}>
+                      {c.academic_year} · {c.target_role}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {c.latest_report_ready && <span className="sv-badge sv-badge-success">Report</span>}
+                  <ChevronRight className="h-4 w-4" style={{ color: 'var(--app-text-soft)' }} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-center text-xs mt-4" style={{ color: 'var(--app-text-soft)' }}>
+          Demo environment — select any candidate to explore the platform.
+        </p>
       </div>
-    </main>
+    </div>
   )
 }
 

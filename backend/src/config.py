@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     socket_path: str = Field(default="/socket.io", alias="SKILLVISTA_SOCKET_PATH")
     uploads_dir: Path = Field(default=DEFAULT_UPLOADS_DIR, alias="SKILLVISTA_UPLOADS_DIR")
 
+    # ── PostgreSQL (production relational DB) ──
+    postgres_url: str | None = Field(default=None, alias="SKILLVISTA_POSTGRES_URL")
+
+    # ── MongoDB (document store for transcripts/analytics) ──
+    mongodb_url: str | None = Field(default=None, alias="SKILLVISTA_MONGODB_URL")
+    mongodb_db_name: str = Field(default="skillvista", alias="SKILLVISTA_MONGODB_DB")
+
+    # ── Redis (task queue, optional) ──
+    redis_url: str | None = Field(default=None, alias="SKILLVISTA_REDIS_URL")
+
+    # ── LLM Providers ──
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
     ollama_model: str = Field(default="llama3.1:8b", alias="OLLAMA_MODEL")
 
@@ -43,6 +54,10 @@ class Settings(BaseSettings):
 
     @property
     def resolved_db_url(self) -> str:
+        """Use PostgreSQL if configured, otherwise fallback to SQLite."""
+        if self.postgres_url:
+            return self.postgres_url
+
         sqlite_prefix = "sqlite:///"
         if not self.db_url.startswith(sqlite_prefix):
             return self.db_url
@@ -61,6 +76,22 @@ class Settings(BaseSettings):
         if self.uploads_dir.is_absolute():
             return self.uploads_dir
         return (BACKEND_ROOT / self.uploads_dir).resolve()
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.resolved_db_url.startswith("sqlite")
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.resolved_db_url.startswith("postgresql")
+
+    @property
+    def has_mongodb(self) -> bool:
+        return bool(self.mongodb_url)
+
+    @property
+    def has_redis(self) -> bool:
+        return bool(self.redis_url)
 
 
 @lru_cache
