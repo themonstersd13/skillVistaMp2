@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TouchableOpacity,
-  SafeAreaView, Dimensions, StatusBar, TextInput, Alert, ActivityIndicator
+  Dimensions, StatusBar, TextInput, Alert, ActivityIndicator
 } from 'react-native';
 import { LineChart } from "react-native-chart-kit";
 import {
   User, Users, TrendingUp, Search,
-  LayoutDashboard, Award, ChevronRight, ArrowLeft,
-  BrainCircuit, Zap, LogIn
+  LayoutDashboard, Award, ChevronRight, BrainCircuit, Zap, LogIn
 } from 'lucide-react-native';
+
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 
 import api from './api';
 
@@ -26,22 +29,58 @@ const COLORS = {
   border: '#E2E8F0'
 };
 
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+// --- Main App Root ---
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [role, setRole] = useState('student'); // 'student' or 'faculty'
-  const [activeTab, setActiveTab] = useState('Home');
-  const [selectedStudent, setSelectedStudent] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    // Check if token exists on load
+    const checkAuth = async () => {
+      // For demo purposes, we will just start unauthenticated
+      setLoading(false);
+    };
+    checkAuth();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerBackground]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <StatusBar barStyle="dark-content" />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!isAuthenticated ? (
+          <Stack.Screen name="Login">
+            {(props) => <LoginScreen {...props} onAuthSuccess={() => setIsAuthenticated(true)} />}
+          </Stack.Screen>
+        ) : (
+          <Stack.Screen name="MainFlow">
+           {(props) => <MainFlow {...props} onLogout={() => setIsAuthenticated(false)} />}
+          </Stack.Screen>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// --- Main Flow (Tabs + Stack for Detail) ---
+function MainFlow({ onLogout }) {
+  const [role, setRole] = useState('student'); // 'student' or 'faculty'
+  const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [latestReport, setLatestReport] = useState(null);
   const [cohortData, setCohortData] = useState([]);
-  const [loading, setLoading] = useState(false);
 
-  // Load dashboard data based on role
   useEffect(() => {
-    if (!isAuthenticated) return;
-
     let mounted = true;
     setLoading(true);
 
@@ -56,7 +95,7 @@ export default function App() {
             const reportRes = await api.getMyLatestReport();
             if (mounted) setLatestReport(reportRes);
           } catch (e) {
-            if (mounted) setLatestReport(null); // no report yet
+            if (mounted) setLatestReport(null);
           }
         } else {
           const cohortRes = await api.getCohortData();
@@ -71,130 +110,106 @@ export default function App() {
 
     loadData();
     return () => { mounted = false; };
-  }, [role, isAuthenticated]);
-
-  // Transform cohort data for standard shape
-  const facultyStudents = useMemo(() => {
-    return cohortData.map(s => ({
-      id: String(s.student_id),
-      name: s.name,
-      status: s.status === 'green' ? 'On Track' : s.status === 'yellow' ? 'Fair' : 'At Risk',
-      time: s.last_interview_date ? new Date(s.last_interview_date).toLocaleDateString() : 'Never',
-      readiness: s.overall_readiness ? Math.round(s.overall_readiness) : 0,
-      trend: s.overall_readiness >= 50 ? 'up' : 'down',
-      trajectory: [s.overall_readiness || 0], // Simplification for now
-      swot: {
-        technical: [
-          { label: "Technical", val: Math.round(s.technical_score || 0), desc: "Overall technical score" },
-          { label: "Problem Solving", val: Math.round(s.technical_score || 0), desc: "Problem solving skills" }
-        ],
-        nonTechnical: [
-          { label: "Behavioral", val: Math.round(s.behavioral_score || 0), desc: "Behavioral and team fit" },
-          { label: "Communication", val: Math.round(s.communication_score || 0), desc: "Clarity and structure" }
-        ]
-      }
-    }));
-  }, [cohortData]);
-
-  const filteredStudents = useMemo(() => {
-    return facultyStudents.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [facultyStudents, searchQuery]);
-
-  const handleLogin = async (studentId) => {
-    setLoading(true);
-    try {
-      await api.loginCandidate(studentId);
-      setIsAuthenticated(true);
-      setActiveTab('Home');
-    } catch (err) {
-      Alert.alert('Login failed', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [role]);
 
   const handleLogout = () => {
     api.clearAuthToken();
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    setLatestReport(null);
+    onLogout();
   };
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} loading={loading} />;
-  }
-
-  // Current student formatted
-  const studentDataFormatted = {
-    name: currentUser?.name || 'Student',
-    readiness: latestReport?.quantitative?.overall_readiness ? Math.round(latestReport.quantitative.overall_readiness) : 0,
-    trajectory: [0, latestReport?.quantitative?.overall_readiness ? Math.round(latestReport.quantitative.overall_readiness) : 0],
-    swot: {
-      technical: [
-        { label: "Technical", val: latestReport?.quantitative?.technical_score ? Math.round(latestReport.quantitative.technical_score) : 0, desc: "Technical accuracy" },
-        { label: "Confidence", val: latestReport?.quantitative?.confidence_score ? Math.round(latestReport.quantitative.confidence_score) : 0, desc: "Confidence in technical answers" }
-      ],
-      nonTechnical: [
-        { label: "Behavioral", val: latestReport?.quantitative?.behavioral_score ? Math.round(latestReport.quantitative.behavioral_score) : 0, desc: "Professional and situational awareness" },
-        { label: "Communication", val: latestReport?.quantitative?.communication_score ? Math.round(latestReport.quantitative.communication_score) : 0, desc: "Clarity of communication" }
-      ]
-    }
-  };
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={{ marginTop: 10, color: COLORS.subtext }}>Syncing with SkillVista Cloud...</Text>
-        </View>
-      );
-    }
-
-    if (selectedStudent) return <StudentDetailView student={selectedStudent} onBack={() => setSelectedStudent(null)} />;
-
-    switch (activeTab) {
-      case 'Home':
-        return role === 'student' ? <StudentHome data={studentDataFormatted} /> :
-               <FacultyHome students={filteredStudents} onSelect={setSelectedStudent} search={searchQuery} setSearch={setSearchQuery} />;
-      case 'Analysis':
-        return <AnalysisView data={role === 'student' ? studentDataFormatted : null} />;
-      case 'Profile':
-        return <ProfileView role={role} setRole={setRole} user={currentUser} onLogout={handleLogout} />;
-      default:
-        return <StudentHome data={studentDataFormatted} />;
-    }
-  };
-
+  // Switch between Faculty Tab Group and Student Tab Group dynamically
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSubtitle}>SKILLVISTA • {selectedStudent ? 'Analysis' : activeTab}</Text>
-          <Text style={styles.headerTitle}>{role === 'student' ? 'My Progress' : 'Faculty Admin'}</Text>
-        </View>
-        <TouchableOpacity style={styles.avatarCircle} onPress={() => setRole(role === 'student' ? 'faculty' : 'student')}>
-           {role === 'student' ? <BrainCircuit color={COLORS.primary} size={20} /> : <Users color={COLORS.primary} size={20} />}
-        </TouchableOpacity>
-      </View>
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: true,
+        headerStyle: { elevation: 0, shadowOpacity: 0, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+        headerTitleStyle: { fontSize: 20, fontWeight: '900', color: COLORS.text },
+        headerRight: () => (
+          <TouchableOpacity style={[styles.avatarCircle, { marginRight: 15 }]} onPress={() => setRole(role === 'student' ? 'faculty' : 'student')}>
+             {role === 'student' ? <BrainCircuit color={COLORS.primary} size={20} /> : <Users color={COLORS.primary} size={20} />}
+          </TouchableOpacity>
+        ),
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.subtext,
+        tabBarStyle: { height: 60, paddingBottom: 10, paddingTop: 10, borderTopColor: '#F1F5F9' }
+      })}
+    >
+      {/* HOME TAB */}
+      <Tab.Screen 
+        name="Dashboard" 
+        options={{
+            title: role === 'student' ? 'My Progress' : 'Faculty Admin',
+            tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={22} />
+        }}
+      >
+        {(props) => (
+           <HomeStack 
+             role={role} 
+             currentUser={currentUser} 
+             latestReport={latestReport} 
+             cohortData={cohortData} 
+             loading={loading} 
+             {...props} 
+           />
+        )}
+      </Tab.Screen>
 
-      <View style={styles.mainView}>{renderContent()}</View>
+      {/* SWOT TAB */}
+      <Tab.Screen 
+        name="Analysis" 
+        options={{
+            title: 'SWOT Analysis',
+            tabBarIcon: ({ color }) => <TrendingUp color={color} size={22} />
+        }}
+      >
+        {(props) => <AnalysisTab role={role} latestReport={latestReport} loading={loading} />}
+      </Tab.Screen>
 
-      <View style={styles.navBar}>
-        <NavBtn label="Home" icon={LayoutDashboard} active={activeTab === 'Home'} onPress={() => { setActiveTab('Home'); setSelectedStudent(null); }} />
-        <NavBtn label="SWOT" icon={TrendingUp} active={activeTab === 'Analysis'} onPress={() => setActiveTab('Analysis')} />
-        <NavBtn label="User" icon={User} active={activeTab === 'Profile'} onPress={() => setActiveTab('Profile')} />
-      </View>
-    </SafeAreaView>
+      {/* PROFILE TAB */}
+      <Tab.Screen 
+        name="Profile" 
+        options={{
+            title: 'Profile',
+            tabBarIcon: ({ color }) => <User color={color} size={22} />
+        }}
+      >
+         {(props) => <ProfileView role={role} setRole={setRole} user={currentUser} onLogout={handleLogout} />}
+      </Tab.Screen>
+    </Tab.Navigator>
   );
 }
 
+// --- Home Stack (Allows navigating to Student Details for Faculty) ---
+function HomeStack({ role, currentUser, latestReport, cohortData, loading }) {
+  if (loading) {
+     return <View style={styles.center}><ActivityIndicator color={COLORS.primary}/></View>;
+  }
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {role === 'student' ? (
+         <Stack.Screen name="StudentHomeOverview">
+            {props => <StudentHome user={currentUser} report={latestReport} {...props} />}
+         </Stack.Screen>
+      ) : (
+         <>
+           <Stack.Screen name="FacultyDashboard">
+              {props => <FacultyHome cohortData={cohortData} {...props} />}
+           </Stack.Screen>
+           <Stack.Screen name="FacultyStudentDetail" component={StudentDetailView} />
+         </>
+      )}
+    </Stack.Navigator>
+  );
+}
+
+
 // --- SUB-VIEWS ---
 
-function LoginScreen({ onLogin, loading }) {
+function LoginScreen({ onAuthSuccess }) {
   const [candidates, setCandidates] = useState([]);
   const [fetching, setFetching] = useState(true);
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -202,7 +217,7 @@ function LoginScreen({ onLogin, loading }) {
         const res = await api.getCandidates();
         setCandidates(res || []);
       } catch (err) {
-        Alert.alert('Network Error', 'Ensure the backend is running on your machine and accessible.');
+        Alert.alert('Network Error', 'Ensure the backend is running and reachable.');
       } finally {
         setFetching(false);
       }
@@ -210,21 +225,32 @@ function LoginScreen({ onLogin, loading }) {
     load();
   }, []);
 
+  const handleLogin = async (id) => {
+    setLoggingIn(true);
+    try {
+      await api.loginCandidate(id);
+      onAuthSuccess();
+    } catch (err) {
+      Alert.alert("Login Failed", err.message);
+      setLoggingIn(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={[styles.container, styles.centerBackground]}>
+    <View style={[styles.container, styles.centerBackground]}>
       <View style={styles.loginContainer}>
         <View style={styles.bigAvatar}>
           <Text style={{fontSize: 24, fontWeight: '900', color: COLORS.primary}}>SV</Text>
         </View>
         <Text style={styles.loginTitle}>SkillVista Mobile</Text>
-        <Text style={styles.loginSub}>Select a candidate to begin demo</Text>
+        <Text style={styles.loginSub}>Select a candidate to begin</Text>
         
         {fetching ? (
            <ActivityIndicator color={COLORS.primary} />
         ) : (
           <ScrollView style={styles.loginScroll}>
             {candidates.map(c => (
-              <TouchableOpacity key={c.id} style={styles.loginCard} onPress={() => onLogin(c.id)}>
+              <TouchableOpacity key={c.id} style={styles.loginCard} onPress={() => handleLogin(c.id)}>
                 <View style={styles.rowCenter}>
                   <View style={styles.avatarCircleSmall}><Text style={styles.avatarText}>{c.name.charAt(0)}</Text></View>
                   <View style={{ marginLeft: 10 }}>
@@ -238,31 +264,30 @@ function LoginScreen({ onLogin, loading }) {
           </ScrollView>
         )}
       </View>
-      {loading && (
+      {loggingIn && (
         <View style={styles.overlay}>
           <ActivityIndicator size="large" color={COLORS.white} />
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
-function StudentHome({ data }) {
-  const hasData = data && data.readiness > 0;
-  
+function StudentHome({ user, report }) {
+  const readiness = report?.quantitative?.overall_readiness ? Math.round(report.quantitative.overall_readiness) : 0;
   return (
     <ScrollView contentContainerStyle={styles.scrollPadding}>
       <View style={styles.readinessCard}>
         <Award color={COLORS.primary} size={32} />
-        <Text style={styles.giantScore}>{data.readiness}%</Text>
+        <Text style={styles.giantScore}>{readiness}%</Text>
         <Text style={styles.cardLabel}>Placement Readiness</Text>
-        <View style={styles.barContainer}><View style={[styles.barFill, { width: `${data.readiness}%` }]} /></View>
+        <View style={styles.barContainer}><View style={[styles.barFill, { width: `${readiness}%` }]} /></View>
       </View>
       
-      {hasData ? (
+      {readiness > 0 ? (
         <>
           <Text style={styles.sectionTitle}>Skill Projection</Text>
-          <LineChart data={{ labels: ["Prev", "Current"], datasets: [{ data: data.trajectory }] }} width={width - 40} height={180} chartConfig={chartConfig} bezier style={styles.roundedChart} />
+          <LineChart data={{ labels: ["Prev", "Current"], datasets: [{ data: [0, readiness] }] }} width={width - 40} height={180} chartConfig={chartConfig} bezier style={styles.roundedChart} />
         </>
       ) : (
         <View style={[styles.center, { marginTop: 40 }]}>
@@ -274,20 +299,39 @@ function StudentHome({ data }) {
   );
 }
 
-function FacultyHome({ students, onSelect, search, setSearch }) {
-  return (
-    <ScrollView contentContainerStyle={styles.scrollPadding}>
-      <View style={styles.searchBox}>
-        <Search size={18} color={COLORS.subtext} />
-        <TextInput placeholder="Search students..." style={styles.searchInput} value={search} onChangeText={setSearch} />
-      </View>
+function FacultyHome({ cohortData, navigation }) {
+  const [search, setSearch] = useState('');
 
-      <Text style={styles.sectionTitle}>Cohort Overview</Text>
-      {students.length === 0 ? (
-         <Text style={{color: COLORS.subtext, textAlign: 'center', marginTop: 20}}>No students found.</Text>
-      ) : (
-        students.map((s) => (
-          <TouchableOpacity key={s.id} style={styles.studentItem} onPress={() => onSelect(s)}>
+  const facultyStudents = useMemo(() => {
+    return cohortData.map(s => ({
+      id: String(s.student_id),
+      name: s.name,
+      status: s.status === 'green' ? 'On Track' : s.status === 'yellow' ? 'Fair' : 'At Risk',
+      time: s.last_interview_date ? new Date(s.last_interview_date).toLocaleDateString() : 'Never',
+      readiness: s.overall_readiness ? Math.round(s.overall_readiness) : 0,
+      trend: s.overall_readiness >= 50 ? 'up' : 'down',
+      swot: {
+        technical: [
+          { label: "Technical", val: Math.round(s.technical_score || 0), desc: "Overall technical score" }
+        ],
+        nonTechnical: [
+          { label: "Behavioral", val: Math.round(s.behavioral_score || 0), desc: "Behavioral and team fit" }
+        ]
+      }
+    })).filter(s => s.name.toLowerCase().includes(search.toLowerCase()));
+  }, [cohortData, search]);
+
+  return (
+    <View style={{flex: 1, backgroundColor: COLORS.background}}>
+      <ScrollView contentContainerStyle={styles.scrollPadding}>
+        <View style={styles.searchBox}>
+          <Search size={18} color={COLORS.subtext} />
+          <TextInput placeholder="Search students..." style={styles.searchInput} value={search} onChangeText={setSearch} />
+        </View>
+
+        <Text style={styles.sectionTitle}>Cohort Overview</Text>
+        {facultyStudents.map((s) => (
+          <TouchableOpacity key={s.id} style={styles.studentItem} onPress={() => navigation.navigate('FacultyStudentDetail', { student: s })}>
             <View style={styles.rowCenter}>
               <View style={[styles.trendDot, { backgroundColor: s.trend === 'up' ? COLORS.secondary : COLORS.danger }]} />
               <View>
@@ -297,33 +341,62 @@ function FacultyHome({ students, onSelect, search, setSearch }) {
             </View>
             <ChevronRight color={COLORS.subtext} size={18} />
           </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
-  );
-}
-
-function StudentDetailView({ student, onBack }) {
-  return (
-    <View style={{flex: 1}}>
-      <ScrollView contentContainerStyle={styles.scrollPadding}>
-        <TouchableOpacity onPress={onBack} style={styles.backRow}>
-          <ArrowLeft size={18} color={COLORS.primary} /><Text style={styles.backText}>Back to Dashboard</Text>
-        </TouchableOpacity>
-        <Text style={styles.detailName}>{student.name}</Text>
-        <AnalysisView data={student} hideHeader />
+        ))}
       </ScrollView>
     </View>
   );
 }
 
-function AnalysisView({ data, hideHeader }) {
-  if (!data || data.readiness === 0) return (
-     <View style={[styles.center, {padding: 40}]}>
-       <Text style={{color: COLORS.subtext, textAlign: 'center'}}>Incomplete Data: Complete an interview to generate SWOT analysis.</Text>
-     </View>
-  );
+function StudentDetailView({ route, navigation }) {
+  const { student } = route.params;
 
+  return (
+    <View style={{flex: 1, backgroundColor: COLORS.background}}>
+       <View style={{padding: 20, paddingBottom: 10, flexDirection: 'row', alignItems:'center'}}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={{padding:5, marginRight: 10, backgroundColor: COLORS.white, borderRadius: 10}}>
+             <ArrowLeft size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+          <Text style={{fontSize: 20, fontWeight: '800'}}>{student.name}</Text>
+       </View>
+       <ScrollView contentContainerStyle={{padding: 20}}>
+          <View style={{alignItems: 'center', marginBottom: 30}}>
+             <Text style={{fontSize: 40, fontWeight: '900', color: COLORS.primary}}>{student.readiness}%</Text>
+             <Text style={{color: COLORS.subtext, fontWeight: '600'}}>Overall Readiness</Text>
+          </View>
+          <RenderSWOT data={student.swot} />
+       </ScrollView>
+    </View>
+  );
+}
+
+function AnalysisTab({ role, latestReport, loading }) {
+  if (loading) return <View style={styles.center}><ActivityIndicator color={COLORS.primary} /></View>;
+  if (role !== 'student') return <View style={styles.center}><Text style={{color: COLORS.subtext}}>Select a student from the Dashboard to view their analysis.</Text></View>;
+
+  const swot = {
+    technical: [
+      { label: "Technical", val: latestReport?.quantitative?.technical_score ? Math.round(latestReport.quantitative.technical_score) : 0, desc: "Technical accuracy" },
+      { label: "Confidence", val: latestReport?.quantitative?.confidence_score ? Math.round(latestReport.quantitative.confidence_score) : 0, desc: "Confidence in technical answers" }
+    ],
+    nonTechnical: [
+      { label: "Behavioral", val: latestReport?.quantitative?.behavioral_score ? Math.round(latestReport.quantitative.behavioral_score) : 0, desc: "Professional and situational awareness" },
+      { label: "Communication", val: latestReport?.quantitative?.communication_score ? Math.round(latestReport.quantitative.communication_score) : 0, desc: "Clarity of communication" }
+    ]
+  };
+
+  if(!latestReport) {
+     return <View style={styles.center}><Text style={{color: COLORS.subtext}}>No analysis exists. Start an interview first.</Text></View>
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.scrollPadding}>
+       <Text style={styles.sectionTitle}>AI Breakdown</Text>
+       <RenderSWOT data={swot} />
+    </ScrollView>
+  );
+}
+
+function RenderSWOT({ data }) {
   const getInsight = (val) => {
     if (val >= 75) return { label: 'Strong', color: COLORS.secondary };
     if (val >= 50) return { label: 'Fair', color: COLORS.primary };
@@ -352,17 +425,16 @@ function AnalysisView({ data, hideHeader }) {
   );
 
   return (
-    <View style={!hideHeader && styles.scrollPadding}>
-      {!hideHeader && <Text style={styles.sectionTitle}>AI Breakdown</Text>}
-      {renderSection("Technical Benchmarks", data.swot.technical)}
-      {renderSection("Behavioral Benchmarks", data.swot.nonTechnical)}
+    <View>
+      {renderSection("Technical Benchmarks", data.technical)}
+      {renderSection("Behavioral Benchmarks", data.nonTechnical)}
     </View>
   );
 }
 
 function ProfileView({ role, setRole, user, onLogout }) {
   return (
-    <View style={styles.centerPadding}>
+    <ScrollView contentContainerStyle={styles.centerPadding}>
       <View style={styles.bigAvatar}><Zap size={32} color={COLORS.primary}/></View>
       <Text style={styles.profileTitle}>{role === 'student' ? user?.name || 'Student' : 'Faculty Admin'}</Text>
       <Text style={styles.profileSub}>{user?.academic_year || 'Faculty'} • {user?.target_role || 'Admin'}</Text>
@@ -374,18 +446,11 @@ function ProfileView({ role, setRole, user, onLogout }) {
       <TouchableOpacity style={[styles.outlineBtn, {borderColor: COLORS.danger, marginTop: 20}]} onPress={onLogout}>
          <Text style={[styles.outlineText, {color: COLORS.danger}]}>Logout</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 // --- UTILS & STYLES ---
-
-const NavBtn = ({ label, icon: Icon, active, onPress }) => (
-  <TouchableOpacity style={styles.navItem} onPress={onPress}>
-    <Icon color={active ? COLORS.primary : COLORS.subtext} size={22} />
-    <Text style={[styles.navLabel, active && { color: COLORS.primary }]}>{label}</Text>
-  </TouchableOpacity>
-);
 
 const chartConfig = {
   backgroundGradientFrom: "#fff",
@@ -397,12 +462,8 @@ const chartConfig = {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  centerBackground: { justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 20, backgroundColor: COLORS.white, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  headerSubtitle: { fontSize: 10, color: COLORS.subtext, fontWeight: '800', letterSpacing: 1.5, textTransform: 'uppercase' },
-  headerTitle: { fontSize: 22, fontWeight: '900', color: COLORS.text },
-  avatarCircle: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
-  mainView: { flex: 1 },
+  centerBackground: { justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
+  avatarCircle: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' },
   scrollPadding: { padding: 20 },
   readinessCard: { backgroundColor: COLORS.white, borderRadius: 24, padding: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3 },
   giantScore: { fontSize: 56, fontWeight: '900', color: COLORS.primary },
@@ -417,9 +478,6 @@ const styles = StyleSheet.create({
   trendDot: { width: 8, height: 8, borderRadius: 4, marginRight: 15 },
   studentName: { fontWeight: '700', fontSize: 16 },
   studentMeta: { fontSize: 12, color: COLORS.subtext, marginTop: 2 },
-  backRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  backText: { color: COLORS.primary, fontWeight: '700', marginLeft: 8 },
-  detailName: { fontSize: 26, fontWeight: '900', marginBottom: 20 },
   sectionGap: { marginBottom: 25 },
   swotHeader: { fontSize: 12, fontWeight: '800', color: COLORS.primary, textTransform: 'uppercase', marginBottom: 12 },
   infoCard: { backgroundColor: COLORS.white, borderRadius: 20, padding: 20, marginBottom: 12 },
@@ -435,9 +493,6 @@ const styles = StyleSheet.create({
   profileSub: { color: COLORS.subtext, marginTop: 5, textAlign: 'center' },
   outlineBtn: { marginTop: 40, padding: 15, width: '100%', borderRadius: 12, borderWidth: 1, borderColor: COLORS.primary, alignItems: 'center' },
   outlineText: { color: COLORS.primary, fontWeight: '700' },
-  navBar: { height: 80, backgroundColor: COLORS.white, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingBottom: 10 },
-  navItem: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  navLabel: { fontSize: 10, marginTop: 4, fontWeight: '700', color: COLORS.subtext },
   roundedChart: { borderRadius: 16, marginLeft: -20 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   

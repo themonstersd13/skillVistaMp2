@@ -8,7 +8,7 @@
  * - Student reports
  */
 
-const BASE_URL = 'http://localhost:8000/api'
+const BASE_URL = 'http://localhost:4000/api'
 
 let _authToken = null
 
